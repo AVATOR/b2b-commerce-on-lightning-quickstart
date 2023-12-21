@@ -47,33 +47,33 @@ else
     echo "Setting up $selection Gateway"
 
     echo "Converting Named Credentials and Gateway Adapter Apex for SFDX use..."
-    sfdx force:mdapi:convert -r $examplesDir
+    sf project convert mdapi -r $examplesDir
     echo "Pushing Named Credentials and Gateway Adapter Apex to org..."
-    sfdx force:source:push -f
+    sf project deploy start -c
 
     # Creating Payment Gateway Provider
     apexClassId=`sf data query -q "SELECT Id FROM ApexClass WHERE Name='$paymentGatewayAdapterName' LIMIT 1" -r csv |tail -n +2`
     echo "Creating PaymentGatewayProvider record using ApexAdapterId=$apexClassId."
-    sfdx force:data:record:create -s PaymentGatewayProvider -v "DeveloperName=$paymentGatewayProviderName ApexAdapterId=$apexClassId MasterLabel=$paymentGatewayProviderName IdempotencySupported=Yes Comments=Comments"
+    sf data create record -s PaymentGatewayProvider -v "DeveloperName=$paymentGatewayProviderName ApexAdapterId=$apexClassId MasterLabel=$paymentGatewayProviderName IdempotencySupported=Yes Comments=Comments"
 
     # Creating Payment Gateway
     paymentGatewayProviderId=`sf data query -q "SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName='$paymentGatewayProviderName' LIMIT 1" -r csv | tail -n +2`
     namedCredentialId=`sf data query -q "SELECT Id FROM NamedCredential WHERE MasterLabel='$namedCredentialMasterLabel' LIMIT 1" -r csv | tail -n +2`
     echo "Creating PaymentGateway record using MerchantCredentialId=$namedCredentialId, PaymentGatewayProviderId=$paymentGatewayProviderId."
-    sfdx force:data:record:create -s PaymentGateway -v "MerchantCredentialId=$namedCredentialId PaymentGatewayName=$paymentGatewayName PaymentGatewayProviderId=$paymentGatewayProviderId Status=Active"
+    sf data create record -s PaymentGateway -v "MerchantCredentialId=$namedCredentialId PaymentGatewayName=$paymentGatewayName PaymentGatewayProviderId=$paymentGatewayProviderId Status=Active"
 
     # Creating Store Integrated Service
     storeId=`sf data query -q "SELECT Id FROM WebStore WHERE Name='$1' LIMIT 1" -r csv | tail -n +2`
     serviceMappingId=`sf data query -q "SELECT Id FROM StoreIntegratedService WHERE StoreId='$storeId' AND ServiceProviderType='Payment' LIMIT 1" -r csv | tail -n +2`
     if [ ! -z $serviceMappingId ]; then
         echo "StoreMapping already exists.  Deleting old mapping."
-        sfdx force:data:record:delete -s StoreIntegratedService -i $serviceMappingId
+        sf data delete record -s StoreIntegratedService -i $serviceMappingId
     fi
 
     storeId=`sf data query -q "SELECT Id FROM WebStore WHERE Name='$1' LIMIT 1" -r csv | tail -n +2`
     paymentGatewayId=`sf data query -q "SELECT Id FROM PaymentGateway WHERE PaymentGatewayName='$paymentGatewayName' LIMIT 1" -r csv | tail -n +2`
     echo "Creating StoreIntegratedService using the $1 store and Integration=$paymentGatewayId (PaymentGatewayId)"
-    sfdx force:data:record:create -s StoreIntegratedService -v "Integration=$paymentGatewayId StoreId=$storeId ServiceProviderType=Payment"
+    sf data create record -s StoreIntegratedService -v "Integration=$paymentGatewayId StoreId=$storeId ServiceProviderType=Payment"
 
     # To set store mapping to a different Gateway see Store Integrations or run:"
     # force:org:open -p /lightning/page/storeDetail?lightning__webStoreId=$storeId."
@@ -82,5 +82,5 @@ else
     echo "A Named Credential has been set up for you.  Please update it to use a valid username and password."
     read -p "Press [Enter/Return] to continue ..."
 
-    sfdx force:org:open -p lightning/setup/NamedCredential/page?address=%2F$namedCredentialId
+    sf org open -p lightning/setup/NamedCredential/page?address=%2F$namedCredentialId
 fi

@@ -40,7 +40,7 @@ then
 	cat $pkgRtrvTmpFile
 
 	echo "Retrieving the store metadata and extracting it from the zip file."
-	sfdx force:mdapi:retrieve -r experience-bundle-package -k $pkgRtrvTmpFile
+	sf project retrieve start -t experience-bundle-package -x $pkgRtrvTmpFile
 	unzip -d experience-bundle-package experience-bundle-package/unpackaged.zip
 fi
 
@@ -54,8 +54,8 @@ pathToGuestProfile="../examples/users/guest-user-profile-setup"
 srcGuestProfile="$pathToGuestProfile/profiles/InsertStoreNameHere Profile.profile"
 trgtGuestProfile="$pathToGuestProfile/profiles/$communityNetworkName Profile.profile"
 mv "$srcGuestProfile" "$trgtGuestProfile"
-sfdx force:mdapi:convert -r $pathToGuestProfile -d putSourceGuestProfileHere
-sfdx force:source:deploy  -p putSourceGuestProfileHere
+sf project convert mdapi -r $pathToGuestProfile -d putSourceGuestProfileHere
+sf project deploy start -d putSourceGuestProfileHere
 rm -r putSourceGuestProfileHere
 
 # Sharing Rules
@@ -81,10 +81,10 @@ mv "$trgtGuestProfile" "$srcGuestProfile"
 
 # Enable Guest Browsing for WebStore and create Guest Buyer Profile.
 # Assign to Buyer Group of choice.
-sfdx force:data:record:update -s WebStore -v "OptionsGuestBrowsingEnabled='true'" -w "Name='$communityNetworkName'"
+sf data update record -s WebStore -v "OptionsGuestBrowsingEnabled='true'" -w "Name='$communityNetworkName'"
 guestBuyerProfileId=`sf data query --query \ "SELECT GuestBuyerProfileId FROM WebStore WHERE Name = '$communityNetworkName'" -r csv |tail -n +2`
 buyergroupID=`sf data query --query \ "SELECT Id FROM BuyerGroup WHERE Name = '${buyergroupName}'" -r csv |tail -n +2`
-sfdx force:data:record:create -s BuyerGroupMember -v "BuyerId='$guestBuyerProfileId' BuyerGroupId='$buyergroupID'"
+sf data create record -s BuyerGroupMember -v "BuyerId='$guestBuyerProfileId' BuyerGroupId='$buyergroupID'"
 
 # Refactor? Use functions?
 if [ "$settingUpStore" == false ] && [ -d "experience-bundle-package/unpackaged" ]
@@ -99,14 +99,14 @@ then
 	# read -p "Press any key to resume ..."
 
 	echo "Deploy the new zip including the flow, ignoring warnings, then clean-up."
-	sfdx force:mdapi:deploy -g -f experience-bundle-package/"$communityExperienceBundleName"ToDeploy.zip --wait -1 --verbose --singlepackage
+	sf project deploy start -g --metadata-dir experience-bundle-package/"$communityExperienceBundleName"ToDeploy.zip --wait -1 --verbose --single-package
 	rm -fr experience-bundle-package
 
 	echo "Removing the package xml files used for retrieving and deploying metadata at this step."
 	rm $pkgRtrvTmpFile
 
 	echo "Publishing the community."
-	sfdx force:community:publish -n "$communityNetworkName"
+	sf community publish -n "$communityNetworkName"
 	sleep 10s
 fi
 

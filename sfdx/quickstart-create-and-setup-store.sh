@@ -27,7 +27,7 @@ else
     storename=$1
 fi
 
-sfdx force:community:create --name "$storename" --template-name "$templateName" --url-path-prefix "$storename" --description "Store $storename created by Quick Start script."
+sf community create --name "$storename" --template-name "$templateName" --url-path-prefix "$storename" --description "Store $storename created by Quick Start script."
 
 echo ""
 
@@ -47,7 +47,7 @@ echo ""
 
 echo_attention "Pushing store sources..."
 set -x
-sfdx force:source:push -f
+sf project deploy start -c
 set +x
 
 echo ""

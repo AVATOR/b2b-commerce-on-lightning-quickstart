@@ -2,7 +2,7 @@
 # Use this command followed by a store name.
 #
 # Before running this script make sure that you completed all the previous steps in the setup
-# (run convert-examples-to-sfdx.sh, execute sfdx force:source:push -f, create store)
+# (run convert-examples-to-sfdx.sh, execute sf project deploy start -c, create store)
 #
 # This script will:
 # - register the Apex classes needed for checkout integrations and map them to your store
@@ -38,7 +38,7 @@ echo "Using this to retrieve your store info:"
 cat package-retrieve.xml
 
 echo "Retrieving the store metadata and extracting it from the zip file."
-sfdx force:mdapi:retrieve -r experience-bundle-package -k package-retrieve.xml
+sf project retrieve start -t experience-bundle-package -x package-retrieve.xml
 unzip -d experience-bundle-package experience-bundle-package/unpackaged.zip
 
 #############################
@@ -64,10 +64,10 @@ function register_and_map_integration() {
 	then
 		echo "There was a problem getting the ID of the Apex class $1 for checkout integrations."
 		echo "The registration and mapping for this class will be skipped!"
-		echo "Make sure that you run convert-examples-to-sfdx.sh and execute sfdx force:source:push -f before setting up your store."
+		echo "Make sure that you run convert-examples-to-sfdx.sh and execute sf project deploy start -c before setting up your store."
 	else
 		# Register the Apex class. If the class is already registered, a "duplicate value found" error will be displayed but the script will continue.
-		sfdx force:data:record:create -s RegisteredExternalService -v "DeveloperName=$2 ExternalServiceProviderId=$apexClassId ExternalServiceProviderType=$3 MasterLabel=$2"
+		sf data create record -s RegisteredExternalService -v "DeveloperName=$2 ExternalServiceProviderId=$apexClassId ExternalServiceProviderType=$3 MasterLabel=$2"
 
 		# Map the Apex class to the store if no other mapping exists for the same Service Provider Type
 		local storeIntegratedServiceId=`sf data query -q "SELECT Id FROM StoreIntegratedService WHERE ServiceProviderType='$3' AND StoreId='$storeId' LIMIT 1" -r csv |tail -n +2`
@@ -75,7 +75,7 @@ function register_and_map_integration() {
 		then
 			# No mapping exists, so we will create one
 			local registeredExternalServiceId=`sf data query -q "SELECT Id FROM RegisteredExternalService WHERE ExternalServiceProviderId='$apexClassId' LIMIT 1" -r csv |tail -n +2`
-			sfdx force:data:record:create -s StoreIntegratedService -v "Integration=$registeredExternalServiceId StoreId=$storeId ServiceProviderType=$3"
+			sf data create record -s StoreIntegratedService -v "Integration=$registeredExternalServiceId StoreId=$storeId ServiceProviderType=$3"
 		else
 			echo "There is already a mapping in this store for $3 ServiceProviderType: $storeIntegratedServiceId"
 		fi
@@ -92,7 +92,7 @@ function map_standard_integration {
 	local integrationId=`sf data query -q "SELECT Id FROM StoreIntegratedService WHERE ServiceProviderType='$serviceProviderType' AND StoreId='$storeId' LIMIT 1" -r csv |tail -n +2`
 	if [ -z "$integrationId" ]
 	then
-		sfdx force:data:record:create -s StoreIntegratedService -v "Integration=$integrationName StoreId=$storeId ServiceProviderType=$serviceProviderType"
+		sf data create record -s StoreIntegratedService -v "Integration=$integrationName StoreId=$storeId ServiceProviderType=$serviceProviderType"
 		echo "To register an external ($serviceProviderType) integration, delete the internal mapping and then add the external ($serviceProviderType) mapping.  See the code for details how."
 	else
 		echo "There is already a mapping in this store for ($serviceProviderType) ServiceProviderType: $integrationId"
@@ -113,20 +113,20 @@ function register_and_map_credit_card_payment_integration {
 	# Creating Payment Gateway Provider
 	apexClassId=`sf data query -q "SELECT Id FROM ApexClass WHERE Name='SalesforceAdapter' LIMIT 1" -r csv |tail -n +2`
 	echo "Creating PaymentGatewayProvider record using ApexAdapterId=$apexClassId."
-	sfdx force:data:record:create -s PaymentGatewayProvider -v "DeveloperName=SalesforcePGP ApexAdapterId=$apexClassId MasterLabel=SalesforcePGP IdempotencySupported=Yes Comments=Comments"
+	sf data create record -s PaymentGatewayProvider -v "DeveloperName=SalesforcePGP ApexAdapterId=$apexClassId MasterLabel=SalesforcePGP IdempotencySupported=Yes Comments=Comments"
 
 	# Creating Payment Gateway
 	paymentGatewayProviderId=`sf data query -q "SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName='SalesforcePGP' LIMIT 1" -r csv | tail -n +2`
 	namedCredentialId=`sf data query -q "SELECT Id FROM NamedCredential WHERE MasterLabel='Salesforce' LIMIT 1" -r csv | tail -n +2`
 	echo "Creating PaymentGateway record using MerchantCredentialId=$namedCredentialId, PaymentGatewayProviderId=$paymentGatewayProviderId."
-	sfdx force:data:record:create -s PaymentGateway -v "MerchantCredentialId=$namedCredentialId PaymentGatewayName=SalesforcePG PaymentGatewayProviderId=$paymentGatewayProviderId Status=Active"
+	sf data create record -s PaymentGateway -v "MerchantCredentialId=$namedCredentialId PaymentGatewayName=SalesforcePG PaymentGatewayProviderId=$paymentGatewayProviderId Status=Active"
 
 	# Creating Store Integrated Service
 	storeId=`sf data query -q "SELECT Id FROM WebStore WHERE Name='$communityNetworkName' LIMIT 1" -r csv | tail -n +2`
 	paymentGatewayId=`sf data query -q "SELECT Id FROM PaymentGateway WHERE PaymentGatewayName='SalesforcePG' LIMIT 1" -r csv | tail -n +2`
 
 	echo "Creating StoreIntegratedService using the $communityNetworkName store and Integration=$paymentGatewayId (PaymentGatewayId)"
-	sfdx force:data:record:create -s StoreIntegratedService -v "Integration=$paymentGatewayId StoreId=$storeId ServiceProviderType=Payment"
+	sf data create record -s StoreIntegratedService -v "Integration=$paymentGatewayId StoreId=$storeId ServiceProviderType=Payment"
 }
 
 register_and_map_integration "B2BCheckInventorySample" "CHECK_INVENTORY" "Inventory"
@@ -179,27 +179,27 @@ buyergroupName=$(bash ./import_products.sh $1 | tail -n 1)
 # Assign a role to the admin user, else update user will error out
 echo "5. Mapping Admin User to Role."
 ceoID=`sf data query --query \ "SELECT Id FROM UserRole WHERE Name = 'CEO'" -r csv |tail -n +2`
-sfdx force:data:record:create -s UserRole -v "ParentRoleId='$ceoID' Name='AdminRoleFromQuickstart' DeveloperName='AdminRoleFromQuickstart' RollupDescription='AdminRoleFromQuickstart' "
+sf data create record -s UserRole -v "ParentRoleId='$ceoID' Name='AdminRoleFromQuickstart' DeveloperName='AdminRoleFromQuickstart' RollupDescription='AdminRoleFromQuickstart' "
 newRoleID=`sf data query --query \ "SELECT Id FROM UserRole WHERE Name = 'AdminRoleFromQuickstart'" -r csv |tail -n +2`
-username=`sfdx force:user:display | grep "Username" | sed 's/Username//g;s/^[[:space:]]*//g'`
+username=`sf org display user | grep "Username" | sed 's/Username//g;s/^[[:space:]]*//g'`
 
-sfdx force:data:record:update -s User -v "UserRoleId=$newRoleID" -w "Username=$username"
+sf data update record -s User -v "UserRoleId=$newRoleID" -w "Username=$username"
 
 # Create Buyer User. Go to config/buyer-user-def.json to change name, email and alias.
 echo "6. Creating Buyer User with associated Contact and Account."
-sfdx force:user:create -f config/buyer-user-def.json
+sf org create user -f config/buyer-user-def.json
 buyerusername=`grep -i '"Username":' config/buyer-user-def.json|cut -d "\"" -f 4`
 
 # Get most recently created account with JITUserAccount suffix
 # Convert Account to Buyer Account
 echo "Making Account a Buyer Account."
 accountID=`sf data query --query \ "SELECT Id FROM Account WHERE Name LIKE '${buyerusername}JITUserAccount' ORDER BY CreatedDate Desc LIMIT 1" -r csv |tail -n +2`
-sfdx force:data:record:create -s BuyerAccount -v "BuyerId='$accountID' Name='BuyerAccountFromQuickstart' isActive=true"
+sf data create record -s BuyerAccount -v "BuyerId='$accountID' Name='BuyerAccountFromQuickstart' isActive=true"
 
 # Assign Account to Buyer Group
 echo "Assigning Buyer Account to Buyer Group."
 buyergroupID=`sf data query --query \ "SELECT Id FROM BuyerGroup WHERE Name = '${buyergroupName}'" -r csv |tail -n +2`
-sfdx force:data:record:create -s BuyerGroupMember -v "BuyerGroupId='$buyergroupID' BuyerId='$accountID'"
+sf data create record -s BuyerGroupMember -v "BuyerGroupId='$buyergroupID' BuyerId='$accountID'"
 
 # Add Contact Point Addresses to the buyer account associated with the buyer user.
 # The account will have 2 Shipping and 2 billing addresses associated to it.
@@ -208,10 +208,10 @@ echo "7. Add Contact Point Addresses to the Buyer Account."
 existingCPAForBuyerAccount=`sf data query --query \ "SELECT Id FROM ContactPointAddress WHERE ParentId='${accountID}' LIMIT 1" -r csv |tail -n +2`
 if [ -z "$existingCPAForBuyerAccount" ]
 then
-	sfdx force:data:record:create -s ContactPointAddress -v "AddressType='Shipping' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='Canada' IsDefault='true' Name='Default Shipping' PostalCode='V6B 5A7' State='BC' Street='333 Seymour Street (Shipping)'"
-	sfdx force:data:record:create -s ContactPointAddress -v "AddressType='Billing' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='Canada' IsDefault='true' Name='Default Billing' PostalCode='V6B 5A7' State='BC' Street='333 Seymour Street (Billing)'"
-	sfdx force:data:record:create -s ContactPointAddress -v "AddressType='Shipping' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='United States' IsDefault='false' Name='Non-Default Shipping' PostalCode='94105' State='CA' Street='415 Mission Street (Shipping)'"
-	sfdx force:data:record:create -s ContactPointAddress -v "AddressType='Billing' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='United States' IsDefault='false' Name='Non-Default Billing' PostalCode='94105' State='CA' Street='415 Mission Street (Billing)'"
+	sf data create record -s ContactPointAddress -v "AddressType='Shipping' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='Canada' IsDefault='true' Name='Default Shipping' PostalCode='V6B 5A7' State='BC' Street='333 Seymour Street (Shipping)'"
+	sf data create record -s ContactPointAddress -v "AddressType='Billing' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='Canada' IsDefault='true' Name='Default Billing' PostalCode='V6B 5A7' State='BC' Street='333 Seymour Street (Billing)'"
+	sf data create record -s ContactPointAddress -v "AddressType='Shipping' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='United States' IsDefault='false' Name='Non-Default Shipping' PostalCode='94105' State='CA' Street='415 Mission Street (Shipping)'"
+	sf data create record -s ContactPointAddress -v "AddressType='Billing' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='United States' IsDefault='false' Name='Non-Default Billing' PostalCode='94105' State='CA' Street='415 Mission Street (Billing)'"
 else
 	echo "There is already at least 1 Contact Point Address for your Buyer Account ${buyerusername}JITUserAccount"
 fi
@@ -247,22 +247,22 @@ cd ../..
 # read -p "Press any key to resume ..."
 
 echo "Deploy the new zip including the flow, ignoring warnings, then clean-up."
-sfdx force:mdapi:deploy -g -f experience-bundle-package/"$communityExperienceBundleName"ToDeploy.zip --wait -1 --verbose --singlepackage
+sf project deploy start -g --metadata-dir experience-bundle-package/"$communityExperienceBundleName"ToDeploy.zip --wait -1 --verbose --single-package
 rm -fr experience-bundle-package
 
 echo "Removing the package xml files used for retrieving and deploying metadata at this step."
 rm package-retrieve.xml
 
 echo "Publishing the community."
-sfdx force:community:publish -n "$communityNetworkName"
+sf community publish -n "$communityNetworkName"
 sleep 10s
 
 echo "Creating search index."
-sfdx 1commerce:search:start -n "$communityNetworkName"
+sf commerce:search:start -n "$communityNetworkName"
 
 echo "QUICK START COMPLETE!"
 
-sfdx force:user:password:generate -o ${buyerusername}
+sf org generate password -o ${buyerusername}
 echo "Use this buyer user to log in to the store:"
-sfdx force:user:display -u ${buyerusername}
+sf org display user -u ${buyerusername}
 
