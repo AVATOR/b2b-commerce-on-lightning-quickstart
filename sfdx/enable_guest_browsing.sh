@@ -20,15 +20,15 @@ buyergroupName=$2
 
 settingUpStore=false
 
-if [[ ! -z "$3" ]] 
-then    
+if [[ ! -z "$3" ]]
+then
 	settingUpStore="$3"
 fi
 # If not setting up store, retrieve metadata
 # Else work with metadata already retrieved through quickstart-setup-store
 if [ "$settingUpStore" == false ]
 then
-	echo 
+	echo
 	echo
 	echo "**** Standalone setup of Guest Browsing ****"
 	echo
@@ -42,7 +42,7 @@ then
 	echo "Retrieving the store metadata and extracting it from the zip file."
 	sfdx force:mdapi:retrieve -r experience-bundle-package -k $pkgRtrvTmpFile
 	unzip -d experience-bundle-package experience-bundle-package/unpackaged.zip
-fi	
+fi
 
 # Can only force:source:deploy from sfdx project folder
 # Cannot use tmp folders
@@ -61,7 +61,7 @@ rm -r putSourceGuestProfileHere
 # Sharing Rules
 sharingRulesDir="quickstart-config/guestbrowsing/sharingRules"
 productShareTemplate="$sharingRulesDir/Product2-template.sharingRules"
-productCatalogShareTemplate="$sharingRulesDir/ProductCatalog-template.sharingRules"																								
+productCatalogShareTemplate="$sharingRulesDir/ProductCatalog-template.sharingRules"
 actualProductShare="experience-bundle-package/unpackaged/sharingRules/Product2.sharingRules"
 actualProductCatalogShare="experience-bundle-package/unpackaged/sharingRules/ProductCatalog.sharingRules"
 sed -E "s/YourStoreName/$1/g" $productShareTemplate > $actualProductShare
@@ -72,18 +72,18 @@ siteConfigMetaFile="experience-bundle-package/unpackaged/experiences/$communityE
 tmpfile=$(mktemp)
 sed -E "s/\"isAvailableToGuests\" : false/\"isAvailableToGuests\" : true/g" $siteConfigMetaFile > $tmpfile
 mv -f $tmpfile $siteConfigMetaFile
-navMenuItemMetaFile="experience-bundle-package/unpackaged/navigationMenus/Default_Navigation.navigationMenu"	
+navMenuItemMetaFile="experience-bundle-package/unpackaged/navigationMenus/Default_Navigation.navigationMenu"
 tmpfile=$(mktemp)
 sed -E "s/<publiclyAvailable>false/<publiclyAvailable>true/g" $navMenuItemMetaFile > $tmpfile
 mv -f $tmpfile $navMenuItemMetaFile
 
 mv "$trgtGuestProfile" "$srcGuestProfile"
 
-# Enable Guest Browsing for WebStore and create Guest Buyer Profile. 
+# Enable Guest Browsing for WebStore and create Guest Buyer Profile.
 # Assign to Buyer Group of choice.
 sfdx force:data:record:update -s WebStore -v "OptionsGuestBrowsingEnabled='true'" -w "Name='$communityNetworkName'"
-guestBuyerProfileId=`sfdx force:data:soql:query --query \ "SELECT GuestBuyerProfileId FROM WebStore WHERE Name = '$communityNetworkName'" -r csv |tail -n +2`
-buyergroupID=`sfdx force:data:soql:query --query \ "SELECT Id FROM BuyerGroup WHERE Name = '${buyergroupName}'" -r csv |tail -n +2`
+guestBuyerProfileId=`sf data query --query \ "SELECT GuestBuyerProfileId FROM WebStore WHERE Name = '$communityNetworkName'" -r csv |tail -n +2`
+buyergroupID=`sf data query --query \ "SELECT Id FROM BuyerGroup WHERE Name = '${buyergroupName}'" -r csv |tail -n +2`
 sfdx force:data:record:create -s BuyerGroupMember -v "BuyerId='$guestBuyerProfileId' BuyerGroupId='$buyergroupID'"
 
 # Refactor? Use functions?

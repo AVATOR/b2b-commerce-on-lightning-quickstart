@@ -45,7 +45,7 @@ unzip -d experience-bundle-package experience-bundle-package/unpackaged.zip
 #       Update Store        #
 #############################
 
-storeId=`sfdx force:data:soql:query -q "SELECT Id FROM WebStore WHERE Name='$1' LIMIT 1" -r csv |tail -n +2`
+storeId=`sf data query -q "SELECT Id FROM WebStore WHERE Name='$1' LIMIT 1" -r csv |tail -n +2`
 
 # Register Apex classes needed for checkout integrations and map them to the store
 echo "1. Setting up your integrations."
@@ -59,7 +59,7 @@ function register_and_map_integration() {
 	echo "Registering Apex class $1 ($2) for $3 integration."
 
 	# Get the Id of the Apex class
-	local apexClassId=`sfdx force:data:soql:query -q "SELECT Id FROM ApexClass WHERE Name='$1' LIMIT 1" -r csv |tail -n +2`
+	local apexClassId=`sf data query -q "SELECT Id FROM ApexClass WHERE Name='$1' LIMIT 1" -r csv |tail -n +2`
 	if [ -z "$apexClassId" ]
 	then
 		echo "There was a problem getting the ID of the Apex class $1 for checkout integrations."
@@ -70,11 +70,11 @@ function register_and_map_integration() {
 		sfdx force:data:record:create -s RegisteredExternalService -v "DeveloperName=$2 ExternalServiceProviderId=$apexClassId ExternalServiceProviderType=$3 MasterLabel=$2"
 
 		# Map the Apex class to the store if no other mapping exists for the same Service Provider Type
-		local storeIntegratedServiceId=`sfdx force:data:soql:query -q "SELECT Id FROM StoreIntegratedService WHERE ServiceProviderType='$3' AND StoreId='$storeId' LIMIT 1" -r csv |tail -n +2`
+		local storeIntegratedServiceId=`sf data query -q "SELECT Id FROM StoreIntegratedService WHERE ServiceProviderType='$3' AND StoreId='$storeId' LIMIT 1" -r csv |tail -n +2`
 		if [ -z "$storeIntegratedServiceId" ]
 		then
 			# No mapping exists, so we will create one
-			local registeredExternalServiceId=`sfdx force:data:soql:query -q "SELECT Id FROM RegisteredExternalService WHERE ExternalServiceProviderId='$apexClassId' LIMIT 1" -r csv |tail -n +2`
+			local registeredExternalServiceId=`sf data query -q "SELECT Id FROM RegisteredExternalService WHERE ExternalServiceProviderId='$apexClassId' LIMIT 1" -r csv |tail -n +2`
 			sfdx force:data:record:create -s StoreIntegratedService -v "Integration=$registeredExternalServiceId StoreId=$storeId ServiceProviderType=$3"
 		else
 			echo "There is already a mapping in this store for $3 ServiceProviderType: $storeIntegratedServiceId"
@@ -89,7 +89,7 @@ function map_standard_integration {
 
 	echo "Mapping internal ($integrationName) for $serviceProviderType integration."
 
-	local integrationId=`sfdx force:data:soql:query -q "SELECT Id FROM StoreIntegratedService WHERE ServiceProviderType='$serviceProviderType' AND StoreId='$storeId' LIMIT 1" -r csv |tail -n +2`
+	local integrationId=`sf data query -q "SELECT Id FROM StoreIntegratedService WHERE ServiceProviderType='$serviceProviderType' AND StoreId='$storeId' LIMIT 1" -r csv |tail -n +2`
 	if [ -z "$integrationId" ]
 	then
 		sfdx force:data:record:create -s StoreIntegratedService -v "Integration=$integrationName StoreId=$storeId ServiceProviderType=$serviceProviderType"
@@ -111,19 +111,19 @@ function register_and_map_credit_card_payment_integration {
 	echo "Registering credit card payment integration."
 
 	# Creating Payment Gateway Provider
-	apexClassId=`sfdx force:data:soql:query -q "SELECT Id FROM ApexClass WHERE Name='SalesforceAdapter' LIMIT 1" -r csv |tail -n +2`
+	apexClassId=`sf data query -q "SELECT Id FROM ApexClass WHERE Name='SalesforceAdapter' LIMIT 1" -r csv |tail -n +2`
 	echo "Creating PaymentGatewayProvider record using ApexAdapterId=$apexClassId."
 	sfdx force:data:record:create -s PaymentGatewayProvider -v "DeveloperName=SalesforcePGP ApexAdapterId=$apexClassId MasterLabel=SalesforcePGP IdempotencySupported=Yes Comments=Comments"
 
 	# Creating Payment Gateway
-	paymentGatewayProviderId=`sfdx force:data:soql:query -q "SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName='SalesforcePGP' LIMIT 1" -r csv | tail -n +2`
-	namedCredentialId=`sfdx force:data:soql:query -q "SELECT Id FROM NamedCredential WHERE MasterLabel='Salesforce' LIMIT 1" -r csv | tail -n +2`
+	paymentGatewayProviderId=`sf data query -q "SELECT Id FROM PaymentGatewayProvider WHERE DeveloperName='SalesforcePGP' LIMIT 1" -r csv | tail -n +2`
+	namedCredentialId=`sf data query -q "SELECT Id FROM NamedCredential WHERE MasterLabel='Salesforce' LIMIT 1" -r csv | tail -n +2`
 	echo "Creating PaymentGateway record using MerchantCredentialId=$namedCredentialId, PaymentGatewayProviderId=$paymentGatewayProviderId."
 	sfdx force:data:record:create -s PaymentGateway -v "MerchantCredentialId=$namedCredentialId PaymentGatewayName=SalesforcePG PaymentGatewayProviderId=$paymentGatewayProviderId Status=Active"
 
 	# Creating Store Integrated Service
-	storeId=`sfdx force:data:soql:query -q "SELECT Id FROM WebStore WHERE Name='$communityNetworkName' LIMIT 1" -r csv | tail -n +2`
-	paymentGatewayId=`sfdx force:data:soql:query -q "SELECT Id FROM PaymentGateway WHERE PaymentGatewayName='SalesforcePG' LIMIT 1" -r csv | tail -n +2`
+	storeId=`sf data query -q "SELECT Id FROM WebStore WHERE Name='$communityNetworkName' LIMIT 1" -r csv | tail -n +2`
+	paymentGatewayId=`sf data query -q "SELECT Id FROM PaymentGateway WHERE PaymentGatewayName='SalesforcePG' LIMIT 1" -r csv | tail -n +2`
 
 	echo "Creating StoreIntegratedService using the $communityNetworkName store and Integration=$paymentGatewayId (PaymentGatewayId)"
 	sfdx force:data:record:create -s StoreIntegratedService -v "Integration=$paymentGatewayId StoreId=$storeId ServiceProviderType=Payment"
@@ -141,7 +141,7 @@ register_and_map_pricing_integration
 # https://developer.salesforce.com/docs/atlas.en-us.b2b_comm_lex_dev.meta/b2b_comm_lex_dev/b2b_comm_lex_integration_setup.htm
 
 # By default, use the internal promotions integration
-register_and_map_promotions_integration 
+register_and_map_promotions_integration
 
 register_and_map_credit_card_payment_integration
 
@@ -155,7 +155,7 @@ checkoutFileToGrep="Checkout.json"
 # Do a case insensitive grep and capture file
 greppedFile=`ls $checkoutMetaFolder | egrep -i "^$checkoutFileToGrep"`
 echo "Grepped File is: " $greppedFile
-checkoutMetaFile=$checkoutMetaFolder$greppedFile	
+checkoutMetaFile=$checkoutMetaFolder$greppedFile
 tmpfile=$(mktemp)
 # This determines the name of the main flow as it will always be the only flow to terminate in "Checkout.flow"
 mainFlowName=`ls force-app/main/default/flows/*Checkout.flow-meta.xml | sed 's/.*flows\/\(.*\).flow-meta.xml/\1/'`
@@ -178,9 +178,9 @@ buyergroupName=$(bash ./import_products.sh $1 | tail -n 1)
 
 # Assign a role to the admin user, else update user will error out
 echo "5. Mapping Admin User to Role."
-ceoID=`sfdx force:data:soql:query --query \ "SELECT Id FROM UserRole WHERE Name = 'CEO'" -r csv |tail -n +2`
+ceoID=`sf data query --query \ "SELECT Id FROM UserRole WHERE Name = 'CEO'" -r csv |tail -n +2`
 sfdx force:data:record:create -s UserRole -v "ParentRoleId='$ceoID' Name='AdminRoleFromQuickstart' DeveloperName='AdminRoleFromQuickstart' RollupDescription='AdminRoleFromQuickstart' "
-newRoleID=`sfdx force:data:soql:query --query \ "SELECT Id FROM UserRole WHERE Name = 'AdminRoleFromQuickstart'" -r csv |tail -n +2`
+newRoleID=`sf data query --query \ "SELECT Id FROM UserRole WHERE Name = 'AdminRoleFromQuickstart'" -r csv |tail -n +2`
 username=`sfdx force:user:display | grep "Username" | sed 's/Username//g;s/^[[:space:]]*//g'`
 
 sfdx force:data:record:update -s User -v "UserRoleId=$newRoleID" -w "Username=$username"
@@ -193,19 +193,19 @@ buyerusername=`grep -i '"Username":' config/buyer-user-def.json|cut -d "\"" -f 4
 # Get most recently created account with JITUserAccount suffix
 # Convert Account to Buyer Account
 echo "Making Account a Buyer Account."
-accountID=`sfdx force:data:soql:query --query \ "SELECT Id FROM Account WHERE Name LIKE '${buyerusername}JITUserAccount' ORDER BY CreatedDate Desc LIMIT 1" -r csv |tail -n +2`
+accountID=`sf data query --query \ "SELECT Id FROM Account WHERE Name LIKE '${buyerusername}JITUserAccount' ORDER BY CreatedDate Desc LIMIT 1" -r csv |tail -n +2`
 sfdx force:data:record:create -s BuyerAccount -v "BuyerId='$accountID' Name='BuyerAccountFromQuickstart' isActive=true"
 
 # Assign Account to Buyer Group
 echo "Assigning Buyer Account to Buyer Group."
-buyergroupID=`sfdx force:data:soql:query --query \ "SELECT Id FROM BuyerGroup WHERE Name = '${buyergroupName}'" -r csv |tail -n +2`
+buyergroupID=`sf data query --query \ "SELECT Id FROM BuyerGroup WHERE Name = '${buyergroupName}'" -r csv |tail -n +2`
 sfdx force:data:record:create -s BuyerGroupMember -v "BuyerGroupId='$buyergroupID' BuyerId='$accountID'"
 
 # Add Contact Point Addresses to the buyer account associated with the buyer user.
 # The account will have 2 Shipping and 2 billing addresses associated to it.
 # To view the addresses in the UI you need to add Contact Point Addresses to the related lists for Account
 echo "7. Add Contact Point Addresses to the Buyer Account."
-existingCPAForBuyerAccount=`sfdx force:data:soql:query --query \ "SELECT Id FROM ContactPointAddress WHERE ParentId='${accountID}' LIMIT 1" -r csv |tail -n +2`
+existingCPAForBuyerAccount=`sf data query --query \ "SELECT Id FROM ContactPointAddress WHERE ParentId='${accountID}' LIMIT 1" -r csv |tail -n +2`
 if [ -z "$existingCPAForBuyerAccount" ]
 then
 	sfdx force:data:record:create -s ContactPointAddress -v "AddressType='Shipping' ParentId='$accountID' ActiveFromDate='2020-01-01' ActiveToDate='2040-01-01' City='Vancouver' Country='Canada' IsDefault='true' Name='Default Shipping' PostalCode='V6B 5A7' State='BC' Street='333 Seymour Street (Shipping)'"
@@ -218,7 +218,7 @@ fi
 
 
 echo "Setting up Commerce Diagnostic Event Process Builder"
-storeId=`sfdx force:data:soql:query -q "SELECT Id FROM WebStore WHERE Name='$communityNetworkName' LIMIT 1" -r csv | tail -n +2`
+storeId=`sf data query -q "SELECT Id FROM WebStore WHERE Name='$communityNetworkName' LIMIT 1" -r csv | tail -n +2`
 processMetaFile="experience-bundle-package/unpackaged/flows/Process_CommerceDiagnosticEvents.flow"
 tmpfile=$(mktemp)
 sed "s/<stringValue>0ZER000000004ZaOAI<\/stringValue>/<stringValue>$storeId<\/stringValue>/g;s/<status>Draft<\/status>/<status>Active<\/status>/g" $processMetaFile > $tmpfile
@@ -226,13 +226,13 @@ mv -f $tmpfile $processMetaFile
 
 echo "Setup Guest Browsing."
 echo "Checking if B2B or B2C"
-storeType=`sfdx force:data:soql:query --query \ "SELECT Type FROM WebStore WHERE Name = '${communityNetworkName}'" -r csv |tail -n +2`
+storeType=`sf data query --query \ "SELECT Type FROM WebStore WHERE Name = '${communityNetworkName}'" -r csv |tail -n +2`
 echo "Store Type is $storeType"
 # Update Guest Profile with required CRUD and FLS
 if [ "$storeType" = "B2C" ]
 then
 	sh ./enable_guest_browsing.sh $communityNetworkName $buyergroupName true
-fi	
+fi
 #############################
 #   Deploy Updated Store    #
 #############################

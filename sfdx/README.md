@@ -6,10 +6,13 @@ This repository provides configuration files and scripts that a Salesforce devel
 
 ## Getting Started
 
-### SFDX Setup
-1. Before continuing with the steps below, see [Salesforce DX Setup Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_intro.htm) to setup SFDX.
+### SF Setup
+1. Before continuing with the steps below, see [Install SF CLI](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_install_cli.htm).
 
-2. Additionally, please install the 1Commerce SFDX Plugin: https://github.com/forcedotcom/sfdx-1commerce-plugin
+
+2. Additionally, please install the _commerce-on-lightning_ SF Plugin: https://github.com/forcedotcom/commerce-on-lightning
+   - sf plugins install @salesforce/commerce
+   - sf plugins install shane-sfdx-plugins
 
 
 ### Quick Start
@@ -40,23 +43,23 @@ that will convert the examples from the metadata API format to the SFDX format a
 3. Create a scratch org using SFDX.
 If you don't have a dev hub already authorized, do that now by running
 ```
-sfdx force:auth:web:login -d
+sfdx org login web -d
 ```
 This will open a new browser window where you have to enter the credentials of your Dev Hub. The -d option will set that Dev Hub as your default one. Once you're logged in, the Dev Hub is authorized and you can close the browser. The Dev Hub will manage your future scratch orgs.
 
 Make sure that your current directory is sfdx. Run the following command to create a scratch org and specify the username for the administrator in an email format:
 ```
-sfdx force:org:create -f config/project-scratch-def.json username=<YourScratchOrgUsernameInEmailFormat> -s -d <DurationInDays>
+sf org create scratch -f config/project-scratch-def.json username=<YourScratchOrgUsernameInEmailFormat> -s -d <DurationInDays>
 ```
 This command may take a while to run (minutes, but not more than 5-10 minutes) and you won't see output while it's running. A password for your user is auto-generated but it's hidden.
 
 To open the new org:
 ```
-sfdx force:org:open
+sf org open
 ```
 Note: if that fails, you might need to first set that new scratch org as your default org with
 ```
-sfdx force:config:set defaultusername=<YourScratchOrgUsernameInEmailFormat>
+sf config set defaultusername=<YourScratchOrgUsernameInEmailFormat>
 ```
 
 Notice that the existing settings in the ```project-scratch-def.json``` file will enable all the necessary licenses and org perms and prefs required for Lightning B2B. If the scratch org creation is successful you should not need to modify any org perms or prefs. This is only available for the scratch orgs though, and will not work for developer edition orgs, sandboxes or other environments. For those orgs, follow the [B2B Commerce on Lightning Experience Setup Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/b2b_standalone_setup.pdf).
@@ -73,7 +76,7 @@ You are done!
 #### Push Samples
 This is taken care of in step 4 of the Quick Start instructions above. However, if you wish to push updated samples to the new org:
 ```
-sfdx force:source:push -f
+sf project deploy start -c
 ```
 #### Setup Store
 This is also triggered by step 4 of the Quick Start instructions above. You would only need to run this step if you wanted to setup a store again. If you have a store already created (from the previous step or because you created it manually), first, make sure to adjust configuration settings such as Username and/or Email in the definition file for your Buyer User at config/buyer-user-def.json. Then run the following script to setup your store:
